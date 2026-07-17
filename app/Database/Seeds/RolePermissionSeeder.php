@@ -44,6 +44,10 @@ class RolePermissionSeeder extends Seeder
                 'reports.view',
             ],
 
+            'employee' => [
+                'referrals.create',
+            ],
+
             'student' => [
                 'appointments.view', 'appointments.create',
                 'screenings.submit',

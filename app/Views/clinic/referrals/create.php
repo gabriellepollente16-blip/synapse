@@ -18,8 +18,10 @@
               data-dialog-submit-label="Send Referral"
               data-dialog-cancel-label="Cancel">
             <?= csrf_field() ?>
-            <input type="hidden" name="student_id" value="<?= $consult['student_id'] ?>">
-            <input type="hidden" name="source_consultation_id" value="<?= $consult['id'] ?>">
+            <input type="hidden" name="student_id" id="student_id" value="<?= $consult['student_id'] ?? ($student['id'] ?? old('student_id')) ?>">
+            <?php if (isset($consult)): ?>
+                <input type="hidden" name="source_consultation_id" value="<?= $consult['id'] ?>">
+            <?php endif ?>
 
             <?php if (! empty($errors)): ?>
                 <div role="alert" id="referral-errors" class="syn-alert syn-alert--danger" style="margin-bottom: 1.25rem;">
@@ -37,14 +39,26 @@
 
             <div style="margin-bottom: 1.25rem;">
                 <label style="display: block; font-size: 0.8rem; font-weight: 500; color: #374151; margin-bottom: 0.3rem;">Patient</label>
-                <p id="referral-patient" style="font-size: 0.9rem; font-weight: 600; color: #111827;"><?= esc($consult['student_first'] . ' ' . $consult['student_last']) ?> <span style="color: #6B7280; font-weight: 400;">(<?= esc($consult['student_number']) ?>)</span></p>
+                <?php if ($consult !== null): ?>
+                    <p id="referral-patient" style="font-size: 0.9rem; font-weight: 600; color: #111827;"><?= esc($consult['student_first'] . ' ' . $consult['student_last']) ?> <span style="color: #6B7280; font-weight: 400;">(<?= esc($consult['student_number']) ?>)</span></p>
+                <?php elseif ($student !== null): ?>
+                    <p id="referral-patient" style="font-size: 0.9rem; font-weight: 600; color: #111827;"><?= esc($student['full_name']) ?> <span style="color: #6B7280; font-weight: 400;">(<?= esc($student['student_number']) ?>)</span></p>
+                <?php else: ?>
+                    <input id="student_search" type="text" name="student_search" value="<?= old('student_search') ?>"
+                        placeholder="Search student name, number, or email"
+                        style="width: 100%; padding: 0.6rem 0.75rem; border: 1px solid #E5E7EB; border-radius: 0.375rem; font-size: 0.85rem; font-family: 'Inter', sans-serif;" autocomplete="off">
+                    <div id="student_search_results" style="margin-top: 0.75rem;
+                        padding: 0.75rem; border: 1px solid #E5E7EB; border-radius: 0.375rem; max-height: 220px; overflow-y: auto; background: #FFFFFF;
+                        display: none;"></div>
+                    <p style="margin-top: 0.75rem; font-size: 0.8rem; color: #6B7280;">Faculty/staff can search for the student and submit a counselling referral.</p>
+                <?php endif; ?>
             </div>
 
             <div style="margin-bottom: 1.25rem;">
                 <label for="referral-reason" style="display: block; font-size: 0.8rem; font-weight: 500; color: #374151; margin-bottom: 0.3rem;">Reason / Complaint Category *</label>
                 <textarea id="referral-reason" name="reason" rows="3" required aria-required="true"
                     <?= isset($errors['reason']) ? 'aria-invalid="true" aria-describedby="referral-reason-err"' : '' ?>
-                    placeholder="Describe the general reason for referral (e.g. Anxiety symptoms, Stress-related concerns)..."
+                    placeholder="Describe the general reason for referral (e.g. Behaviour concerns, stress, academic difficulty)..."
                     style="width: 100%; padding: 0.6rem 0.75rem; border: 1px solid #E5E7EB; border-radius: 0.375rem; font-size: 0.85rem; font-family: 'Inter', sans-serif; resize: vertical;"><?= old('reason') ?></textarea>
                 <?php if (isset($errors['reason'])): ?>
                     <p id="referral-reason-err" style="margin: 0.3rem 0 0; font-size: 0.75rem; color: #DC2626;"><?= esc($errors['reason']) ?></p>
@@ -95,5 +109,66 @@ document.querySelectorAll('input[name="priority"]').forEach(radio => {
         this.parentElement.style.background = this.value === 'emergency' ? '#FEF2F2' : (this.value === 'urgent' ? '#FFFBEB' : '#ECFDF5');
     });
 });
+
+const studentSearch = document.getElementById('student_search');
+const searchResults = document.getElementById('student_search_results');
+const studentIdField = document.getElementById('student_id');
+
+if (studentSearch && searchResults && studentIdField) {
+    let debounce = null;
+
+    function renderResults(results) {
+        if (!results.length) {
+            searchResults.innerHTML = '<p style="margin:0;color:#6B7280;font-size:0.85rem;">No students found. Try another name, email, or student number.</p>';
+            searchResults.style.display = 'block';
+            return;
+        }
+
+        searchResults.innerHTML = results.map(student => {
+            return `<button type="button" class="student-search-result" data-id="${student.id}" data-name="${student.first_name} ${student.last_name}" data-number="${student.student_number}" style="width:100%;text-align:left;padding:0.75rem;border:none;background:none;cursor:pointer;display:block;">` +
+                `<strong>${student.first_name} ${student.last_name}</strong><br><span style="font-size:0.8rem;color:#6B7280;">${student.student_number} · ${student.email}</span>` +
+                `</button>`;
+        }).join('');
+
+        searchResults.style.display = 'block';
+        document.querySelectorAll('.student-search-result').forEach(button => {
+            button.addEventListener('click', () => {
+                const id = button.getAttribute('data-id');
+                const name = button.getAttribute('data-name');
+                const number = button.getAttribute('data-number');
+                studentIdField.value = id;
+                studentSearch.value = `${name} (${number})`;
+                searchResults.style.display = 'none';
+            });
+        });
+    }
+
+    studentSearch.addEventListener('input', () => {
+        const q = studentSearch.value.trim();
+        studentIdField.value = '';
+
+        if (debounce) {
+            clearTimeout(debounce);
+        }
+
+        if (q.length < 2) {
+            searchResults.style.display = 'none';
+            return;
+        }
+
+        debounce = setTimeout(() => {
+            fetch(`/clinic/students/search?q=${encodeURIComponent(q)}&method=manual`, {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            })
+                .then(res => res.json())
+                .then(data => {
+                    renderResults(data.results || []);
+                })
+                .catch(() => {
+                    searchResults.style.display = 'none';
+                });
+        }, 250);
+    });
+}
 </script>
 <?= $this->endSection() ?>

@@ -1,6 +1,6 @@
-# SYNAPSE AG — Step-by-Step Workflows by User Role
+# SYNAPSE — Step-by-Step Workflows by User Role
 
-> **Project:** SYNAPSE AG — Foundation University unified campus information system
+> **Project:** SYNAPSE: A Unified Web-Based Campus Management System — An IoT-Enabled Approach to Health, Counselling, and Facilities Operations at Foundation University
 > **Stack:** PHP 8.2 + CodeIgniter 4.7.3 + MySQL 8
 > **Source of truth:** [`app/Config/Routes.php`](../app/Config/Routes.php), [`app/Controllers/**`](../app/Controllers/), [`app/Views/components/sidebar.php`](../app/Views/components/sidebar.php)
 > **Last updated:** 2026-07-15
@@ -34,7 +34,7 @@ This document describes the canonical user journeys through the system, one sect
 | `counsellor` | Guidance Counsellor | `/dashboard/counsellor` |
 | `facilities_staff` | Facilities / Composting Staff | `/dashboard/bmg` |
 | `report_viewer` | Report Viewer | `/dashboard/reports` |
-| `employee` | University Employee | `/dashboard/employee` |
+| `employee` | University employee with referral access | `/dashboard/employee` |
 | `student` | Student | `/dashboard/student` |
 
 ---
@@ -164,8 +164,9 @@ This document describes the canonical user journeys through the system, one sect
 | 1 | Open **Referrals** | `GET /clinic/referrals` (filters: `status`, `direction`) |
 | 2 | From a consultation, click **"Refer to Counselling"** | `GET /clinic/referrals/create/{consultId}` |
 | 3 | Pick a reason + priority → **Save** (auto-generates QR code, broadcasts to all counsellors) | `POST /clinic/referrals/store` |
-| 4 | **Download the QR image** to give to the student (admin / clinic / counsellor) | `GET /referral/qr/{id}` |
-| 5 | Student or counsellor scans the QR — opens the public verifier | `GET /referral/verify/{token}` |
+| 4 | If authorized as an employee, use direct referral mode to refer a student without a consultation | `GET /clinic/referrals/create` → `POST /clinic/referrals/store` |
+| 5 | **Download the QR image** to give to the student (admin / clinic / counsellor) | `GET /referral/qr/{id}` |
+| 6 | Student or counsellor scans the QR — opens the public verifier | `GET /referral/verify/{token}` |
 
 ### 2.6 Medicine inventory
 
@@ -218,29 +219,18 @@ This document describes the canonical user journeys through the system, one sect
 | 4 | Open the appointment detail | `GET /counselling/appointments/{id}` |
 | 5 | **Start session** (status → `confirmed`) | `POST /counselling/appointments/start/{id}` |
 | 6 | **Complete session** (saves notes, resets student's consecutive no-show counter) | `POST /counselling/appointments/complete/{id}` |
-| 7 | **Mark no-show** (3 consecutive → fires welfare alert) | `POST /counselling/appointments/no-show/{id}` |
+| 7 | **Mark no-show** (3 consecutive → triggers a follow-up alert) | `POST /counselling/appointments/no-show/{id}` |
 | 8 | **Cancel** (with reason) | `POST /counselling/appointments/cancel/{id}` |
 
-### 3.2 Screenings & assessments
+### 3.2 Support notes & follow-up
 
 | # | Action | Route |
 |---|---|---|
-| 1 | Open **Screenings** (active templates) | `GET /counselling/screenings` |
-| 2 | Click a template to **take the screening** for a student | `GET /counselling/screenings/take/{templateId}?student_id=...&appointment_id=...` |
-| 3 | Fill responses → **Submit** (calculates total score; PHQ-9 Item 9 > 0 auto-creates a critical crisis alert; score ≥ 10 auto-broadcasts) | `POST /counselling/screenings/submit` |
-| 4 | Open the student's **results** (severity, score history, AI risk) | `GET /counselling/screenings/results/{responseId}` |
-| 5 | Open the student's **full screening history** | `GET /counselling/screenings/history/{studentId}` |
+| 1 | Open the student support record from the appointment detail | `GET /counselling/appointments/{id}` |
+| 2 | Enter case notes, action points, and follow-up details → **Save** | `POST /counselling/appointments/complete/{id}` |
+| 3 | Review the student’s prior support history | `GET /counselling/appointments` |
 
-### 3.3 Crisis alerts
-
-| # | Action | Route |
-|---|---|---|
-| 1 | Open **Crisis Alerts** dashboard | `GET /counselling/crisis` |
-| 2 | **Acknowledge** an alert | `POST /counselling/crisis/acknowledge/{id}` |
-| 3 | **Resolve** an alert (notes required) | `POST /counselling/crisis/resolve/{id}` |
-| 4 | **Escalate** an alert | `POST /counselling/crisis/escalate/{id}` |
-
-### 3.4 Personal availability
+### 3.3 Personal availability
 
 | # | Action | Route |
 |---|---|---|
@@ -249,7 +239,7 @@ This document describes the canonical user journeys through the system, one sect
 | 3 | **Add a full day** of slots (send `slots` JSON in body) | `POST /counselling/availability/add` |
 | 4 | **Remove a slot** (soft delete, sets `is_active=0`) | `POST /counselling/availability/remove/{id}` |
 
-### 3.5 Incoming referrals (from clinic)
+### 3.4 Incoming referrals (from clinic)
 
 | # | Action | Route |
 |---|---|---|
@@ -257,7 +247,7 @@ This document describes the canonical user journeys through the system, one sect
 | 2 | **Accept** a referral (sets `referred_to = self`) | `POST /counselling/referrals/accept/{id}` |
 | 3 | **Decline** a referral | `POST /counselling/referrals/decline/{id}` |
 
-### 3.6 RFID check-in (also used by clinic staff)
+### 3.5 RFID check-in (also used by clinic staff)
 
 | # | Action | Route |
 |---|---|---|
@@ -321,7 +311,18 @@ This document describes the canonical user journeys through the system, one sect
 |---|---|---|
 | 1 | Open **BMG Reports** (yield by drum, duration by waste, monthly totals, drum utilization) | `GET /bmg/reports` |
 | 2 | **Export CSV** — pick `yield-by-drum` / `duration-by-waste` / `monthly-totals` | `GET /bmg/reports/export-csv/{reportKey}` |
+### 4.6 BMG Dashboard Workflow & Simulation Guide
 
+| # | Action | Outcome |
+|---|---|---|
+| 1 | Open `/dashboard/bmg` and review drum status cards, active batches, and report shortcuts | Confirms operational status and what needs attention |
+| 2 | Start a new batch if a drum is available | Creates a batch and flips the drum to `processing` |
+| 3 | Add input weight and category | Captures waste intake and timestamps the cycle |
+| 4 | Log process observations and monitor until completion | Keeps the batch status visible and auditable |
+| 5 | Mark the batch complete and record output weight | Computes yield and prepares the drum for the next cycle |
+| 6 | Review BMG reports to compare yield, duration, and utilization | Provides actionable insights for facilities planning |
+
+> Simulation guide: use sample values such as `40 kg input` and `25 kg output` to demonstrate the full batch lifecycle without live composting activity.
 ---
 
 ## 5. Report Viewer (`report_viewer`)
@@ -364,9 +365,11 @@ This role is read-only across the system. They can browse the same dashboards an
 | 2 | Click your avatar (top-right) → **My Profile** | `GET /profile` |
 | 3 | Update name / email / password → **Save** (min 8 chars if changing password) | `POST /profile/update` |
 | 4 | Sign out (top-right user menu) | `GET /logout` |
-| 5 | Walk up to the clinic kiosk and scan your RFID / QR to check in | `GET /iot/kiosk` → `POST /iot/scan` |
+| 5 | Walk up to the clinic kiosk and scan your RFID / QR to check in or admit yourself | `GET /iot/kiosk` → `POST /iot/scan` |
+| 6 | View your own clinic/medical record history | `GET /dashboard/employee` / profile panels |
+| 7 | If authorized, create a direct counselling referral for a student | `GET /clinic/referrals/create` → `POST /clinic/referrals/store` |
 
-> The employee portal is a read-only landing for personal information. There is no employee-side "book appointment" UI — appointment booking is performed by the counsellor.
+> The employee portal is a read-only landing for personal information. Employees can also use the clinic kiosk for self-admission and review their own medical record history. There is no employee-side "book appointment" UI — appointment booking is performed by the counsellor. Employees with referral permission can still initiate counselling referrals for students via `/clinic/referrals/create`.
 
 ---
 
@@ -380,9 +383,9 @@ This role is read-only across the system. They can browse the same dashboards an
 
 | # | Action | Route |
 |---|---|---|
-| 1 | Open the **Student Portal** (shows upcoming appointments, queue status, available screening templates) | `GET /dashboard/student` |
+| 1 | Open the **Student Portal** (shows upcoming appointments, queue status, and support options) | `GET /dashboard/student` |
 | 2 | Scroll to **My Appointments** section | `dashboard/student#upcoming` (anchor on the same page) |
-| 3 | Scroll to **Available Screenings** section | `dashboard/student#screenings` (anchor) |
+| 3 | Review the **Support Resources** section for referral updates and next steps | `dashboard/student` |
 | 4 | Click avatar → **My Profile** | `GET /profile` |
 | 5 | Update name / email / password → **Save** | `POST /profile/update` |
 
@@ -401,7 +404,7 @@ This role is read-only across the system. They can browse the same dashboards an
 | 1 | Glance at the lobby TV to see your name / queue position | `GET /consultations/queue/display` *(public)* |
 | 2 | TV auto-refreshes state | `GET /consultations/queue/state.json` *(public, every 1 s)* |
 
-> **Note:** The student is the *subject* of clinical and counselling data, not the *actor* for screenings and consultations. The counsellor and clinic staff enter and update those records; the student reads them on the portal.
+> **Note:** The student is the *subject* of clinical and support data, not the *actor* for support consultations. The counsellor and clinic staff enter and update those records; the student reads them on the portal.
 
 ---
 
@@ -425,6 +428,27 @@ These end-to-end sequences involve more than one role and cross module boundarie
    → POST /counselling/referrals/accept/{id}
      • Sets referred_to = self, status='accepted'
      • Notifies the originating clinic staff
+   → POST /counselling/referrals/decline/{id}
+     • Sets status='declined'
+
+### A2. Employee Referral to Counselling
+
+```
+1. employee at /clinic/referrals/create
+   → GET /clinic/referrals/create
+     • Opens the referral form with student search
+     • Searches for a student by name, ID, QR, or RFID via `GET /clinic/students/search`
+     • Selects the student and sets reason + priority
+   → POST /clinic/referrals/store
+     • Creates a `referrals` row with direct student source and direction='clinic_to_counselling'
+     • Auto-generates a QR code PNG
+     • Notifies all counsellors
+     • Returns with success flash
+2. counsellor at /counselling/referrals
+   • Sees the pending referral
+   → POST /counselling/referrals/accept/{id}
+     • Sets referred_to = self, status='accepted'
+     • Notifies the originating employee
    → POST /counselling/referrals/decline/{id}
      • Sets status='declined'
 
@@ -474,21 +498,14 @@ These end-to-end sequences involve more than one role and cross module boundarie
    → POST /counselling/appointments/no-show/{id}  (3 in a row → welfare_alert fires)
 ```
 
-### D. Screening → automatic crisis alert & auto-referral
+### D. Support follow-up & referral
 
 ```
-1. counsellor at /counselling/screenings/take/{templateId}?student_id=X
-   → POST /counselling/screenings/submit
-     • Calculates totalScore
-     • Saves an assessment_response
-     • If template is PHQ-9 and Item 9 > 0:
-         → createFromScreening() inserts a crisis_alert (severity=critical)
-     • If totalScore >= 10:
-         → broadcasts notification to all counsellors
-     • Runs RiskScorer::analyzeHistory() → trend + anomaly detection
-     • If risk_level=critical OR anomaly_detected:
-         → inserts an ai_risk_scores row + broadcasts "AI Distress Trend Alert"
-   → Returns to /counselling/screenings/results/{responseId}
+1. counsellor at /counselling/appointments/{id}
+   → POST /counselling/appointments/complete/{id}
+     • Records support notes and follow-up actions
+     • Updates the appointment status and notifies the student
+     • Keeps a visible history for future reference
 ```
 
 ### E. Facilities staff records a full batch lifecycle
@@ -574,8 +591,8 @@ Legend: **✓** = allowed, **◐** = read-only, **·** = not allowed
 | Treatments | ✓ | ✓ | · | · | |
 | Referrals (out) | ✓ | ✓ | · | · | |
 | Counselling appointments | ✓ | ✓ | ✓ | ✓ | All status transitions |
-| Screenings | ✓ | ✓ | · | · | |
-| Crisis alerts | ✓ (auto) | ✓ | ✓ | · | Acknowledge / resolve / escalate |
+| Support notes | ✓ | ✓ | · | · | |
+| Follow-up alerts | ✓ | ✓ | ✓ | · | |
 | Availability | ✓ | ✓ | ✓ | · | |
 | Medicines / batches | ✓ | ✓ | ✓ | · | |
 | Reorder requests | ✓ | ✓ | ✓ | ✓ | Full state machine |
@@ -598,7 +615,7 @@ Legend: **✓** = allowed, **◐** = read-only, **·** = not allowed
 | Referrals (clinic → counselling) | ✓ | ✓ | · | · |
 | Medicines / batches | ✓ | ✓ | ✓ | · |
 | Reorder requests | ✓ | ✓ | ✓ | ✓ (approve / order / receive / cancel) |
-| Counselling appts / Screenings / Crisis / Availability | · | · | · | · |
+| Counselling appointments / support notes / follow-up alerts / availability | · | · | · | · |
 | BMG modules | · | · | · | · |
 | Reports / Audit | · | · | · | · |
 | Own profile | · | ✓ | ✓ | · |
@@ -609,13 +626,13 @@ Legend: **✓** = allowed, **◐** = read-only, **·** = not allowed
 | Entity | C | R | U | D |
 |---|---|---|---|---|
 | Users / Roles / Audit | · | · | · | · |
-| Students | · (via `?student_id=` query) | ✓ (via screening form) | · | · |
+| Students | · (via `?student_id=` query) | ✓ (via support form) | · | · |
 | Consultations | · | · | · | · |
 | Treatments | · | · | · | · |
 | Referrals (incoming) | · | ✓ | ✓ (accept / decline) | · |
 | Counselling appointments | ✓ | ✓ | ✓ | ✓ (cancel / no-show) |
-| Screenings (responses) | ✓ | ✓ | · | · |
-| Crisis alerts | ✓ (auto on PHQ-9 Item 9 > 0) | ✓ | ✓ (acknowledge / resolve / escalate) | · |
+| Support notes | ✓ | ✓ | · | · |
+| Follow-up alerts | ✓ | ✓ | ✓ | · |
 | Availability (own) | ✓ | ✓ | ✓ | ✓ (soft) |
 | BMG modules / Medicines | · | · | · | · |
 | Own profile | · | ✓ | ✓ | · |
@@ -655,8 +672,11 @@ Legend: **✓** = allowed, **◐** = read-only, **·** = not allowed
 | All entities | · | · | · | · |
 | Own profile | · | ✓ | ✓ | · |
 | Own employee record | · | ✓ (on portal) | · | · |
+| Referrals (clinic → counselling) | ✓ | ✓ | · | · |
 | Notifications | · | ✓ | ✓ | · |
 | Kiosk operations | ✓ (public) | · | · | · |
+
+> Employees with referral permission can create student counselling referrals from `/clinic/referrals/create`.
 
 ### Student (`student`)
 

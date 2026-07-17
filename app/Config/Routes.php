@@ -58,7 +58,6 @@ $routes->group('clinic', ['filter' => 'role:admin,clinic_staff'], static functio
     $routes->get('students', 'Clinic\StudentController::index');
     $routes->get('students/create', 'Clinic\StudentController::create');
     $routes->post('students/store', 'Clinic\StudentController::store');
-    $routes->get('students/search', 'Clinic\StudentController::search'); // AJAX
     $routes->get('students/(:num)', 'Clinic\StudentController::show/$1');
     $routes->get('students/edit/(:num)', 'Clinic\StudentController::edit/$1');
     $routes->post('students/update/(:num)', 'Clinic\StudentController::update/$1');
@@ -82,9 +81,12 @@ $routes->group('clinic', ['filter' => 'role:admin,clinic_staff'], static functio
 
     // Referrals
     $routes->get('referrals', 'Clinic\ReferralController::index');
-    $routes->get('referrals/create/(:num)', 'Clinic\ReferralController::create/$1');
-    $routes->post('referrals/store', 'Clinic\ReferralController::store');
 });
+
+$routes->get('clinic/referrals/create', 'Clinic\ReferralController::create', ['filter' => 'role:admin,clinic_staff,employee']);
+$routes->get('clinic/referrals/create/(:num)', 'Clinic\ReferralController::create/$1', ['filter' => 'role:admin,clinic_staff,employee']);
+$routes->post('clinic/referrals/store', 'Clinic\ReferralController::store', ['filter' => 'role:admin,clinic_staff,employee']);
+$routes->get('clinic/students/search', 'Clinic\StudentController::search', ['filter' => 'role:admin,clinic_staff,employee']);
 
 // ============================================================
 // INVENTORY MODULE (Phase 2)

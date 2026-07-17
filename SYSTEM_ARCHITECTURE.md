@@ -1,7 +1,7 @@
 # SYNAPSE — System Architecture Documentation
 
-> **A Unified Web-Based Platform for Campus Health, Counselling, and Biodegradable Waste Management**  
-> An IoT- and QR/RFID-enabled system consolidating Foundation University's clinic operations, guidance counselling services, and Biodegradable Waste Management (BMG) composting tracking under a single, role-aware web application.
+> **SYNAPSE: A Unified Web-Based Campus Management System — An IoT-Enabled Approach to Health, Counselling, and Facilities Operations at Foundation University**
+> An IoT- and QR/RFID-enabled system consolidating Foundation University's clinic operations, counselling workflows, and Biodegradable Waste Management (BMG) composting tracking under a single, role-aware web application.
 
 [![PHP](https://img.shields.io/badge/PHP-8.2%2B-777BB4?logo=php&logoColor=white)](#tech-stack)
 [![CodeIgniter](https://img.shields.io/badge/CodeIgniter-4.7-EF4223?logo=codeigniter&logoColor=white)](#tech-stack)
@@ -33,7 +33,7 @@
 
 **SYNAPSE** is Foundation University's capstone project that addresses two structurally identical operational problems through a single, unified web platform:
 
-1. **Health & Counselling Fragmentation** — Clinic and guidance counselling records are maintained separately with no shared data layer, appointments and referrals are tracked on paper, and medicine inventory is managed without procurement integration.
+1. **Health & Counselling Fragmentation** — Clinic and counselling records are maintained separately with no shared data layer, appointments and referrals are tracked on paper, and medicine inventory is managed without procurement integration.
 
 2. **BMG Composting Opacity** — The university fabricates multiple Biodegradable Waste Management (BMG) rotating drum composting units, but no digital system exists to record input weight, decomposition duration, or fertilizer yield.
 
@@ -44,7 +44,7 @@ SYNAPSE consolidates **three core modules** under one login, one audit trail, an
 | Module | Domain | Primary Users |
 |--------|--------|---------------|
 | **Clinic Core** | Health services, medicine inventory, RFID check-in | Doctor, Nurse, Clinic Administrator |
-| **Counselling Core** | Guidance counselling appointments, intake notes, QR referrals | Guidance Counsellor |
+| **Counselling Core** | Counselling appointments, intake notes, QR referrals | Guidance Counsellor |
 | **Facilities/Sustainability Core (BMG Tracking)** | Biodegradable waste input/process/output tracking, drum management | Facilities/Composting Staff |
 
 ### The Integration Philosophy
@@ -73,12 +73,21 @@ SYNAPSE consolidates **three core modules** under one login, one audit trail, an
 
 #### Operational Efficiency
 
-- On the health side: addition of employee records alongside student records, combined with cross-referrals between clinic and counselling staff, increases data volume and sensitivity.
+- On the health side: addition of employee records alongside student records, combined with cross-referrals between clinic and support staff, increases data volume and sensitivity.
 - On the facilities side: deployment of multiple BMG units creates a management challenge that manual logbooks cannot scale to meet.
 
-#### Data Governance
+#### Encryption — Application-Layer Component of Hybrid Cryptographic Access Control
 
-Hybrid cryptographic access control, combining **role-based authorization with application-layer encryption**, provides significantly stronger protection than RBAC alone (Chinnasamy & Deepalakshmi, 2022). SYNAPSE extends this governance discipline to its Facilities/Sustainability module, ensuring consistent accountability across all three modules even though their data domains remain separate.
+This implements the **application-layer encryption half** of the hybrid cryptographic access control model justified in the Data Governance rationale (Chinnasamy & Deepalakshmi, 2022) — encryption here is deliberately layered *on top of* RBAC (Section: Role Definitions), not used as a replacement for it.
+
+- **Driver**: openssl
+- **Cipher**: AES-256-CBC
+- **Key**: Stored in `.env` as `ENCRYPTION_KEY`
+- **Encrypted fields**: TOTP secret, backup codes, sensitive PII (e.g., counselling intake notes, per Section 6.3 partitioning)
+
+**Why this matters for governance:** RBAC alone only controls *who can query* a record through the application. If a database were compromised directly (bypassing RBAC entirely — e.g., raw SQL access), RBAC provides no protection. AES-256-CBC encryption 
+at the application layer ensures that even directly-accessed sensitive fields remain unreadable without the encryption key, which is stored separately from the database itself. This two-layer approach is precisely what Chinnasamy and Deepalakshmi (2022) 
+found to be significantly stronger than RBAC alone.
 
 #### Academic Contribution
 
@@ -952,8 +961,10 @@ ai_generated_summaries
 | `counsellor` | Guidance Counsellor | Counselling, Referrals |
 | `facilities_staff` | BMG operator | BMG module (drums, batches, inputs, outputs) |
 | `report_viewer` | Mgmt office, environmental office | Cross-module reports only (read-only) |
-| `employee` | University employee | View own records, book appointments |
+| `employee` | University employee with referral access | View own records, self-admit via clinic kiosk, view own medical record history, refer students to counselling |
 | `student` | Student | View own records, book appointments |
+
+> Employees assigned the `referrals.create` permission can create direct clinic-to-counselling referrals for students without an existing consultation. Employees can also use the clinic kiosk for self-admission and view their own clinic/medical records.
 
 **Permission Matrix (sample):**
 
@@ -962,7 +973,7 @@ ai_generated_summaries
 | view_bmg_dashboard | ✓ | ✗ | ✗ | ✓ | ✓ | ✗ | ✗ |
 | log_bmg_input | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ |
 | view_consultation | ✓ | ✓ | ✓ | ✗ | ✓ | (own) | (own) |
-| create_referral | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ |
+| create_referral | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✗ |
 | view_audit_log | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
 | book_appointment | ✓ | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ |
 
@@ -1094,7 +1105,7 @@ This is a critical architectural principle: BMG, Clinic, and Counselling share t
 **Endpoints (role-routed)**:
 - `GET /dashboard/admin` — System health, user stats
 - `GET /dashboard/clinic` — Queue, patients, low-stock alerts
-- `GET /dashboard/counsellor` — Appointment pipeline, screening backlog
+- `GET /dashboard/counsellor` — Appointment pipeline, follow-up backlog
 - `GET /dashboard/bmg` — **NEW**: Drum status, active batches, recent yields
 - `GET /dashboard/reports` — **NEW**: Cross-module report viewer
 - `GET /dashboard/employee` — **NEW**: My appointments, records
@@ -1323,6 +1334,69 @@ This is a critical architectural principle: BMG, Clinic, and Counselling share t
    └─ Routes to procurement personnel
 ```
 
+### BMG Dashboard Workflow (Operating & Simulation Guide)
+
+This workflow describes how facilities staff should use the BMG dashboard from the landing page down to batch completion and reporting. It is intended both for real operations and for demonstration/simulation purposes.
+
+```
+1. OPEN THE BMG DASHBOARD
+   └─ User logs in and opens /dashboard/bmg
+   └─ Dashboard displays drum status cards, active batches, recent activity, and report shortcuts
+   └─ Purpose: gives the operator a quick overview of what is running, idle, or needs attention
+
+2. SELECT OR CREATE A DRUM
+   └─ If a drum is already available, choose it from the dashboard list
+   └─ If needed, create a new drum entry with code, location, capacity, and status
+   └─ Purpose: ensures the batch is assigned to a valid BMG unit before input is recorded
+
+3. START A NEW BATCH
+   └─ From the dashboard or drums page, choose "Start Batch"
+   └─ Select the drum, waste category, and input weight
+   └─ System stores the batch start time and switches the drum to "Processing"
+   └─ Purpose: initiates a real or simulated composting cycle
+
+4. RECORD INPUT AND PROCESS DATA
+   └─ Add input records for the batch using the weight captured from the physical scale or demo values
+   └─ Add process observations such as moisture, temperature, or notes if available
+   └─ The dashboard updates batch status and drum utilization in real time
+   └─ Purpose: shows the operator that the process is ongoing and being monitored
+
+5. COMPLETE THE PROCESS
+   └─ When decomposition is complete, the operator clicks "Mark Completed"
+   └─ The system records the completion date and calculates duration_days
+   └─ The drum returns to an idle state once the batch is closed
+   └─ Purpose: closes the cycle and prepares the drum for the next batch
+
+6. RECORD OUTPUT AND REVIEW YIELD
+   └─ Enter harvest/fertilizer weight and submit the output record
+   └─ The system calculates yield_percentage and mass_reduction_pct
+   └─ Invalid output values above input are rejected by validation rules
+   └─ Purpose: provides measurable results for reporting and operational review
+
+7. REVIEW REPORTS AND ANALYTICS
+   └─ Open BMG reports from the dashboard to review yield by drum, duration by waste type, and monthly totals
+   └─ These views support decision-making for facilities planning and performance monitoring
+   └─ Purpose: converts operational data into actionable insights
+```
+
+#### Operating Guide
+
+For actual facility use:
+- Use the dashboard as the main control screen for drum readiness and active batches.
+- Confirm the drum status before starting a new batch to avoid overlapping processes.
+- Enter weights and timestamps accurately so duration and yield calculations remain reliable.
+- Review the batch detail page for inputs, observations, and outputs before marking the batch complete.
+- Use the reports view after each cycle to monitor performance trends and spot anomalies.
+
+#### Simulation Guide
+
+For demonstrations or testing:
+- Create a sample drum and assign a waste category such as food waste, twigs/leaves, or mixed waste.
+- Enter simple demo values such as 40 kg input and 25 kg output to simulate a completed cycle.
+- Use the dashboard to observe how the batch moves from processing to completed and how the drum status changes.
+- If the system is being shown to stakeholders, narrate the workflow as: start batch → record input → monitor process → complete batch → record output → review analytics.
+- This allows the team to demonstrate the full lifecycle without requiring live composting activity.
+
 ### BMG Workflow (Input → Process → Output)
 
 ```
@@ -1346,6 +1420,137 @@ This is a critical architectural principle: BMG, Clinic, and Counselling share t
    └─ System: computes mass_reduction_pct = 100 - yield
    └─ System: BLOCKS submission if output > input
    └─ Database: CHECK constraint enforces validation at DB layer
+```
+
+---
+
+## Role-Based Dashboard Workflows
+
+These workflows describe the expected entry point and core activities for each dashboard role in the system.
+
+### Admin Dashboard Workflow
+
+```
+1. LOGIN AND LANDING
+   └─ Admin logs in and opens /dashboard/admin
+   └─ The dashboard highlights system health, recent activity, and high-level module status
+
+2. USER AND ROLE MANAGEMENT
+   └─ Admin opens user management to create, edit, activate, deactivate, or delete accounts
+   └─ Admin assigns or removes roles and reviews permission coverage for each role
+
+3. AUDIT AND COMPLIANCE REVIEW
+   └─ Admin opens audit logs to inspect changes, verify hash-chain integrity, and export records
+   └─ This supports accountability across clinic, counselling, and BMG operations
+
+4. REPORTING AND SYSTEM OVERSIGHT
+   └─ Admin reviews cross-module reports and system status pages
+   └─ This allows oversight without needing to use each module directly
+```
+
+### Clinic Staff Dashboard Workflow
+
+```
+1. LOGIN AND LANDING
+   └─ Clinic staff logs in and opens /dashboard/clinic
+   └─ The dashboard shows the consultation queue, pending referrals, low-stock alerts, and recent activity
+
+2. CHECK-IN AND QUEUE HANDLING
+   └─ Staff receives walk-in arrivals via RFID or QR scan
+   └─ The queue is updated and the next patient is called from the consultation board
+
+3. CONSULTATION MANAGEMENT
+   └─ Staff opens a consultation, records vitals, adds diagnosis/treatment, and completes the case
+   └─ If needed, the case may be referred to counselling or linked to inventory actions
+
+4. INVENTORY AND PROCUREMENT SUPPORT
+   └─ Staff reviews low-stock and expiring medicine items
+   └─ Reorder requests can be triggered directly from the clinic workflow
+```
+
+### Counsellor Dashboard Workflow
+
+```
+1. LOGIN AND LANDING
+   └─ Counsellor logs in and opens /dashboard/counsellor
+   └─ The dashboard shows today's appointments, incoming referrals, and pending follow-up items
+
+2. APPOINTMENT MANAGEMENT
+   └─ Counsellor books, views, starts, completes, or cancels appointments
+   └─ Appointment status and no-show tracking are visible from the dashboard
+
+3. REFERRAL AND FOLLOW-UP HANDLING
+   └─ Counsellor reviews incoming referral requests and accepts or declines them
+   └─ Appointment notes and follow-up actions are recorded for future reference
+
+4. AVAILABILITY AND SCHEDULING
+   └─ Counsellor updates personal availability for future sessions
+   └─ This keeps the appointment booking process consistent and organized
+```
+
+### Facilities / BMG Staff Dashboard Workflow
+
+```
+1. LOGIN AND LANDING
+   └─ Facilities staff logs in and opens /dashboard/bmg
+   └─ The dashboard provides drum status, active batch indicators, and quick access to reports
+
+2. BATCH OPERATIONS
+   └─ Staff opens a drum, starts a new batch, and records input data
+   └─ Process observations are logged until the batch reaches completion
+
+3. CYCLE COMPLETION
+   └─ Staff marks the batch complete and records output weight for yield calculations
+   └─ The drum is then returned to idle or prepared for the next cycle
+
+4. REPORT REVIEW
+   └─ Staff uses the dashboard links to review yield, duration, and monthly BMG analytics
+```
+
+### Report Viewer Dashboard Workflow
+
+```
+1. LOGIN AND LANDING
+   └─ Report viewer logs in and opens /dashboard/reports
+   └─ The dashboard provides read-only views of clinic, counselling, inventory, and BMG data
+
+2. REPORT BROWSING
+   └─ User opens analytics pages and exports reports when available
+   └─ No data changes are allowed, ensuring controlled reporting access
+
+3. DECISION SUPPORT
+   └─ Report viewer uses the dashboard to support operational and administrative review
+```
+
+### Employee Dashboard Workflow
+
+```
+1. LOGIN AND LANDING
+   └─ Employee logs in and opens /dashboard/employee
+   └─ The dashboard presents the employee's own profile and relevant institutional records
+
+2. PERSONAL RECORD REVIEW
+   └─ Employee can review their profile, institutional details, and any linked appointment or check-in information
+
+3. CHECK-IN SUPPORT
+   └─ If required, the employee can use the kiosk or scan-based flow for attendance or visit verification
+4. DIRECT REFERRAL ACCESS
+   └─ If authorized with `referrals.create`, the employee can open `/clinic/referrals/create`, search for a student, and submit a direct counselling referral without a prior consultation
+```
+
+### Student Dashboard Workflow
+
+```
+1. LOGIN AND LANDING
+   └─ Student logs in and opens /dashboard/student
+   └─ The dashboard shows appointments, queue status, and relevant institutional notices
+
+2. APPOINTMENT AND CHECK-IN REVIEW
+   └─ Student can view upcoming appointments and confirm attendance-related information
+   └─ The dashboard also supports the kiosk-based flow for quick check-in or queue updates
+
+3. PROFILE AND SUPPORT ACCESS
+   └─ Student can view and update profile information and review any referral or follow-up notices
 ```
 
 ---
@@ -1421,7 +1626,7 @@ This is a critical architectural principle: BMG, Clinic, and Counselling share t
 
 #### Clinic & Counselling
 - ❌ Excludes: e-prescriptions, medicine dispensing, telemedicine, billing, national health DB integration
-- ❌ Excludes clinical psychiatric screening, psychological diagnosis, and standardized mental health assessment instruments (e.g., PHQ-9, GAD-7); counsellors document concerns and actions via free-text intake notes only
+- ❌ Excludes specialized clinical or psychological services; support staff document concerns and actions through structured notes only
 - ⚠️ Hardware: Development team provides QR/RFID hardware; **university provides RFID-enabled ID cards**
 - ⚠️ Procurement: tracks stock and triggers reorders, but does **not** process purchase transactions/payments
 

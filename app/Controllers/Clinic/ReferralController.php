@@ -37,19 +37,34 @@ class ReferralController extends BaseController
     /**
      * Create referral form.
      */
-    public function create(int $consultationId)
+    public function create(int $consultationId = null)
     {
-        $consultModel = new \App\Models\ConsultationModel();
-        $consult = $consultModel->getFullConsultation($consultationId);
+        $consult = null;
+        $student = null;
 
-        if ($consult === null) {
-            return redirect()->to('/clinic/consultations')->with('error', 'Consultation not found.');
+        if ($consultationId !== null) {
+            $consultModel = new \App\Models\ConsultationModel();
+            $consult = $consultModel->getFullConsultation($consultationId);
+
+            if ($consult === null) {
+                return redirect()->to('/clinic/consultations')->with('error', 'Consultation not found.');
+            }
+        }
+
+        if ($consult === null && $this->request->getGet('student_id')) {
+            $studentModel = new \App\Models\StudentModel();
+            $student = $studentModel->getWithProfile((int) $this->request->getGet('student_id'));
+
+            if ($student === null) {
+                return redirect()->to('/clinic/consultations')->with('error', 'Student not found.');
+            }
         }
 
         return view('clinic/referrals/create', [
             'title'   => 'Create Referral — SYNAPSE',
             'heading' => 'Refer to Counselling',
             'consult' => $consult,
+            'student' => $student,
         ]);
     }
 
@@ -60,7 +75,6 @@ class ReferralController extends BaseController
     {
         $rules = [
             'student_id'              => 'required|is_natural_no_zero',
-            'source_consultation_id'  => 'required|is_natural_no_zero',
             'reason'                  => 'required|min_length[3]',
             'priority'                => 'required|in_list[routine,urgent,emergency]',
         ];
@@ -69,18 +83,20 @@ class ReferralController extends BaseController
             return redirect()->back()->withInput()->with('errors', $this->validator->getErrors());
         }
 
-        $referralId = $this->referralModel->createClinicReferral([
-            'student_id'             => $this->request->getPost('student_id'),
-            'referred_by'            => session()->get('user_id'),
-            // referred_to is intentionally NULL on creation — the referral is
-            // broadcast to all counsellors (via notification). The first
-            // counsellor to accept the referral claims ownership by setting
-            // referred_to = their user_id. See Counselling\ReferralController::accept.
-            'referred_to'            => null,
-            'source_consultation_id' => $this->request->getPost('source_consultation_id'),
-            'reason'                 => $this->request->getPost('reason'),
-            'priority'               => $this->request->getPost('priority'),
-        ]);
+        $data = [
+            'student_id'    => $this->request->getPost('student_id'),
+            'referred_by'   => session()->get('user_id'),
+            'referred_to'   => null,
+            'reason'        => $this->request->getPost('reason'),
+            'priority'      => $this->request->getPost('priority'),
+        ];
+
+        $sourceConsultationId = $this->request->getPost('source_consultation_id');
+        if (! empty($sourceConsultationId) && is_numeric($sourceConsultationId)) {
+            $data['source_consultation_id'] = (int) $sourceConsultationId;
+        }
+
+        $referralId = $this->referralModel->createClinicReferral($data);
 
         if ($referralId) {
             // Auto-generate QR code for this referral
@@ -111,7 +127,18 @@ class ReferralController extends BaseController
             $auditModel->logAction(session()->get('user_id'), 'create', 'clinic', 'referrals', $referralId);
 
             $consultId = $this->request->getPost('source_consultation_id');
-            return redirect()->to("/clinic/consultations/{$consultId}")
+            if (! empty($consultId) && is_numeric($consultId)) {
+                return redirect()->to("/clinic/consultations/{$consultId}")
+                    ->with('success', 'Referral sent to counselling. QR code generated.');
+            }
+
+            $roles = session()->get('roles') ?? [];
+            if (in_array('employee', $roles, true)) {
+                return redirect()->to('/dashboard/employee')
+                    ->with('success', 'Referral sent to counselling. QR code generated.');
+            }
+
+            return redirect()->to('/clinic/referrals')
                 ->with('success', 'Referral sent to counselling. QR code generated.');
         }
 
