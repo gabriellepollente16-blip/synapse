@@ -563,20 +563,114 @@ class DashboardController extends BaseController
 
     /**
      * Employee Portal Dashboard.
-     * Used by employee role — view own records, book appointments.
+     * Used by employee role — view own records, submit referrals,
+     * check own clinic consultations, and see recent notifications.
+     *
+     * Mirrors the Student dashboard structure: stats-grid KPI tiles,
+     * profile card on the left, quick actions / notifications on the
+     * right, plus full-width tables for "My Submitted Referrals" and
+     * "My Recent Consultations".
      */
     public function employee()
     {
-        $employeeModel = new \App\Models\EmployeeModel();
+        $db = \Config\Database::connect();
         $userId = (int) session()->get('user_id');
 
-        // Find employee record for this user
+        $employeeModel = new \App\Models\EmployeeModel();
         $employee = $employeeModel->where('user_id', $userId)->first();
 
+        // -------- KPI STATS --------
+        //   referrals_submitted  — total referrals this employee has filed
+        //   referrals_pending    — open referrals (pending / in_progress)
+        //   consultations         — own clinic visits (scoped via the
+        //                           polymorphic patient_type / employee_id
+        //                           columns added in migration 000004)
+        $stats = [
+            'referrals_submitted' => 0,
+            'referrals_pending'   => 0,
+            'consultations'       => 0,
+        ];
+
+        if ($employee !== null) {
+            $stats['referrals_submitted'] = (int) $db->table('referrals')
+                ->where('referred_by', $userId)
+                ->countAllResults();
+
+            $stats['referrals_pending'] = (int) $db->table('referrals')
+                ->where('referred_by', $userId)
+                ->whereIn('status', ['pending', 'in_progress'])
+                ->countAllResults();
+
+            $stats['consultations'] = (int) $db->table('consultations')
+                ->where('patient_type', 'employee')
+                ->where('employee_id', (int) $employee['id'])
+                ->countAllResults();
+        }
+
+        // -------- MY SUBMITTED REFERRALS --------
+        // Reuses the same join shape as clinic/referrals/index.php
+        // (students + users x2) so the on-screen data is byte-identical
+        // to what clinic staff see in their queue.
+        $myReferrals = $db->table('referrals')
+            ->select('referrals.*, students.student_number, u_student.first_name AS student_first, u_student.last_name AS student_last')
+            ->join('students', 'students.id = referrals.student_id')
+            ->join('users AS u_student', 'u_student.id = students.user_id')
+            ->where('referrals.referred_by', $userId)
+            ->orderBy('referrals.created_at', 'DESC')
+            ->limit(20)
+            ->get()
+            ->getResultArray();
+
+        // -------- MY RECENT CONSULTATIONS --------
+        // Joins users for the attending staff's name. Scoped to the
+        // employee row via patient_type='employee' + employee_id so
+        // student visits don't bleed into an employee's record.
+        $myConsultations = [];
+        if ($employee !== null) {
+            $myConsultations = $db->table('consultations')
+                ->select('consultations.id, consultations.chief_complaint, consultations.diagnosis, consultations.status, consultations.consultation_date, users.first_name AS staff_first, users.last_name AS staff_last')
+                ->join('users', 'users.id = consultations.attending_user_id')
+                ->where('consultations.patient_type', 'employee')
+                ->where('consultations.employee_id', (int) $employee['id'])
+                ->orderBy('consultations.consultation_date', 'DESC')
+                ->limit(10)
+                ->get()
+                ->getResultArray();
+        }
+
+        // -------- NOTIFICATIONS PREVIEW --------
+        // Same query pattern as DashboardController::index() — per-user,
+        // most recent 6, with unread count. Wrapped in try/catch so a
+        // missing notifications table never 500s the dashboard.
+        $notifications    = [];
+        $unreadNotifCount = 0;
+        if ($userId > 0) {
+            try {
+                $notifications = $db->table('notifications')
+                    ->where('user_id', $userId)
+                    ->orderBy('created_at', 'DESC')
+                    ->limit(6)
+                    ->get()
+                    ->getResultArray();
+
+                $unreadNotifCount = (int) $db->table('notifications')
+                    ->where('user_id', $userId)
+                    ->where('is_read', 0)
+                    ->countAllResults();
+            } catch (\Throwable $e) {
+                log_message('warning', 'Employee dashboard notifications query failed: ' . $e->getMessage());
+            }
+        }
+
         return view('dashboard/employee', [
-            'title'    => 'Employee Portal — SYNAPSE',
-            'heading'  => 'Employee Portal',
-            'employee' => $employee,
+            'title'            => 'Employee Portal — SYNAPSE',
+            'heading'          => 'Employee Portal',
+            'employee'         => $employee,
+            'stats'            => $stats,
+            'myReferrals'      => $myReferrals,
+            'myConsultations'  => $myConsultations,
+            'notifications'    => $notifications,
+            'unreadNotifCount' => $unreadNotifCount,
         ]);
     }
 }
