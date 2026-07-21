@@ -15,31 +15,32 @@ class DatabaseSeeder extends Seeder
     {
         echo "=== SYNAPSE Database Seeder ===\n\n";
 
-        echo "[1/7] Seeding Roles...\n";
+        echo "[1/9] Seeding Roles...\n";
         $this->call('RoleSeeder');
 
-        echo "\n[2/7] Seeding Permissions...\n";
+        echo "\n[2/9] Seeding Permissions...\n";
         $this->call('PermissionSeeder');
 
-        echo "\n[3/7] Seeding Role-Permission Assignments...\n";
+        echo "\n[3/9] Seeding Role-Permission Assignments...\n";
         $this->call('RolePermissionSeeder');
 
-        echo "\n[4/7] Seeding Admin User...\n";
+        echo "[4/9] Seeding Admin User...\n";
         $this->call('AdminSeeder');
 
-        echo "\n[5/7] Seeding Medicines & Batches...\n";
+        echo "\n[5/9] Seeding Clinic Staff User...\n";
+        $this->call('ClinicStaffSeeder');
+
+        echo "\n[6/9] Seeding Counsellor User...\n";
+        $this->call('CounsellorSeeder');
+
+        echo "\n[7/9] Seeding Medicines & Batches...\n";
         $this->call('MedicineSeeder');
 
-        echo "\n[6/7] Seeding Students...\n";
+        echo "\n[8/9] Seeding Students...\n";
         $this->call('StudentSeeder');
 
-        echo "\n[7/8] Seeding Assessments (no-op) & Counsellor...\n";
-        $this->call('AssessmentSeeder');
-
-        echo "\n[8/9] Seeding Facilities (BMG drums/batches/process/output)...\n";
+        echo "\n[9/9] Seeding Facilities (BMG) + System Modules registry...\n";
         $this->call('FacilitiesSeeder');
-
-        echo "\n[9/9] Seeding System Modules registry...\n";
         $this->call('SystemModulesSeeder');
 
         echo "\n=== Seeding Complete ===\n";

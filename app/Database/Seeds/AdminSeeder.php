@@ -21,7 +21,7 @@ class AdminSeeder extends Seeder
         // Create admin user
         $this->db->table('users')->insert([
             'email'         => $email,
-            'password_hash' => password_hash('Synapse@2027', PASSWORD_BCRYPT, ['cost' => 12]),
+            'password_hash' => password_hash('TestAdmin123!', PASSWORD_BCRYPT, ['cost' => 12]),
             'first_name'    => 'System',
             'last_name'     => 'Administrator',
             'is_active'     => true,
@@ -41,7 +41,7 @@ class AdminSeeder extends Seeder
                 'role_id'     => $adminRole->id,
                 'assigned_at' => date('Y-m-d H:i:s'),
             ]);
-            echo "  Created admin user: {$email} (password: Synapse@2027)\n";
+            echo "  Created admin user: {$email} (password: TestAdmin123!)\n";
             echo "  Assigned role: admin\n";
         } else {
             echo "  WARNING: Admin role not found. Run RoleSeeder first.\n";
