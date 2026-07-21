@@ -19,6 +19,7 @@ $isAdmin        = in_array('admin', $roles);
 $isClinic       = in_array('clinic_staff',   $roles) || $isAdmin;
 $isCounsellor   = in_array('counsellor',     $roles) || $isAdmin;
 $isStudent      = in_array('student',        $roles);
+$isEmployee     = in_array('employee',       $roles) || $isAdmin;
 $isFacilities   = in_array('facilities_staff', $roles) || $isAdmin;
 $isReportViewer = in_array('report_viewer',  $roles) || $isAdmin;
 
@@ -219,6 +220,55 @@ $navSections = [
                 'label'    => 'My Profile',
                 'href'     => 'profile',
                 'isActive' => fn () => false,
+            ],
+        ],
+    ],
+
+    // ---------- 65 — Employee (HR-integrated university staff)
+    // Mirrors the Student section structure but points at the employee
+    // dashboard and the employee-only referral-create route. Gated on
+    // the `employee` role; admin always passes too.
+    [
+        'priority' => 65,
+        'title'    => 'Employee',
+        'gate'     => $isEmployee,
+        'links'    => [
+            [
+                'icon'     => 'fa-th-large',
+                'label'    => 'Dashboard',
+                'href'     => 'dashboard/employee',
+                'isActive' => fn () => str_starts_with(uri_string(), 'dashboard/employee'),
+            ],
+            [
+                'icon'     => 'fa-paper-plane',
+                'label'    => 'Create Referral',
+                'href'     => 'clinic/referrals/create',
+                'isActive' => fn () => str_starts_with(uri_string(), 'clinic/referrals/create'),
+            ],
+            [
+                'icon'     => 'fa-arrow-right-arrow-left',
+                'label'    => 'My Referrals',
+                'href'     => 'dashboard/employee#my-referrals',
+                'isActive' => fn () => false,
+            ],
+            [
+                'icon'     => 'fa-file-medical',
+                'label'    => 'My Consultations',
+                'href'     => 'dashboard/employee#my-consultations',
+                'isActive' => fn () => false,
+            ],
+            [
+                'icon'     => 'fa-id-card',
+                'label'    => 'My Profile',
+                'href'     => 'profile',
+                'isActive' => fn () => false,
+            ],
+            [
+                'icon'     => 'fa-qrcode',
+                'label'    => 'Check-in Kiosk',
+                'href'     => 'iot/kiosk',
+                'isActive' => fn () => false,
+                'target'   => '_blank',
             ],
         ],
     ],
