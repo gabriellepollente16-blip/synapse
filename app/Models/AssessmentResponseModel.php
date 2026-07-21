@@ -6,6 +6,17 @@ use CodeIgniter\Model;
 
 class AssessmentResponseModel extends Model
 {
+
+    /**
+     * Magic-call guard — the underlying table was dropped by a 2026-07-15 migration.
+     * Any caller that still references this model gets a loud runtime error
+     * instead of an opaque SQL failure. Wrote screening scores.
+     */
+    public function __call($name, $args)
+    {
+        throw new \RuntimeException("AssessmentResponseModel::{$name}" . ' was called but the backing table was dropped from SYNAPSE; see migrations 2026-07-15-000006 / 2026-07-15-000007.');
+    }
+
     protected $table            = 'assessment_responses';
     protected $primaryKey       = 'id';
     protected $useAutoIncrement = true;
@@ -22,13 +33,10 @@ class AssessmentResponseModel extends Model
      */
     public function submit(array $data): int|false
     {
-        // Ensure responses is JSON encoded
-        if (is_array($data['responses'])) {
-            $data['responses'] = json_encode($data['responses']);
-        }
-
-        $this->insert($data);
-        return $this->getInsertID() ?: false;
+        // Backing table dropped (migration 2026-07-15-000006 / 2026-07-15-000007).
+        // Return false so ScreeningController::submit() surfaces a clear
+        // "failed to save" error to the user instead of crashing on insert.
+        return false;
     }
 
     /**
@@ -36,20 +44,8 @@ class AssessmentResponseModel extends Model
      */
     public function getByStudent(int $studentId, int $limit = 10): array
     {
-        $responses = $this->select('assessment_responses.*, assessment_templates.title as template_title, assessment_templates.type as template_type')
-            ->join('assessment_templates', 'assessment_templates.id = assessment_responses.template_id')
-            ->where('student_id', $studentId)
-            ->orderBy('submitted_at', 'DESC')
-            ->limit($limit)
-            ->findAll();
-
-        foreach ($responses as &$r) {
-            if (is_string($r['responses'])) {
-                $r['responses'] = json_decode($r['responses'], true);
-            }
-        }
-
-        return $responses;
+        // Backing table dropped. Return empty array so history views render.
+        return [];
     }
 
     /**
@@ -57,11 +53,8 @@ class AssessmentResponseModel extends Model
      */
     public function getScoreHistory(int $studentId, int $templateId): array
     {
-        return $this->select('total_score, submitted_at')
-            ->where('student_id', $studentId)
-            ->where('template_id', $templateId)
-            ->orderBy('submitted_at', 'ASC')
-            ->findAll();
+        // Backing table dropped. Trend charts show an empty series.
+        return [];
     }
 
     /**
@@ -69,25 +62,9 @@ class AssessmentResponseModel extends Model
      */
     public function getWithTemplate(int $id): ?array
     {
-        $response = $this->select('assessment_responses.*, assessment_templates.title as template_title, assessment_templates.type as template_type, assessment_templates.description as template_description')
-            ->join('assessment_templates', 'assessment_templates.id = assessment_responses.template_id')
-            ->find($id);
-
-        if ($response === null) return null;
-
-        if (is_string($response['responses'])) {
-            $response['responses'] = json_decode($response['responses'], true);
-        }
-
-        // Load questions for display
-        $questionModel = new AssessmentQuestionModel();
-        $response['questions'] = $questionModel->getByTemplate((int) $response['template_id']);
-
-        // Load student info
-        $studentModel = new StudentModel();
-        $response['student'] = $studentModel->getWithProfile((int) $response['student_id']);
-
-        return $response;
+        // Backing table dropped. Return null so ScreeningController::results()
+        // redirects to the index with a "not found" flash message.
+        return null;
     }
 
     /**

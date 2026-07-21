@@ -100,15 +100,17 @@ class ProcurementRouter
     {
         $medicineName = $medicine['brand_name'] ?? $medicine['generic_name'] ?? "Medicine #{$medicine['id']}";
 
-        $this->notificationModel->insert([
-            'recipient_id' => null,  // Broadcast to all admin/procurement roles
-            'type'         => 'reorder_request',
-            'module'       => 'inventory',
-            'title'        => "Reorder Required: {$medicineName}",
-            'message'      => "Stock has fallen to the reorder threshold. A new reorder request has been created.",
-            'reference_id' => $reorderId,
-            'is_read'      => 0,
-            'created_at'   => date('Y-m-d H:i:s'),
-        ]);
+        // Use createNotification helper which serializes module/entityId
+        // into the JSON `data` column. user_id=null triggers broadcast
+        // resolution for admin/procurement roles inside NotificationModel.
+        $this->notificationModel->createNotification(
+            null,
+            'reorder_request',
+            "Reorder Required: {$medicineName}",
+            'Stock has fallen to the reorder threshold. A new reorder request has been created.',
+            'inventory',
+            'reorder_requests',
+            $reorderId
+        );
     }
 }

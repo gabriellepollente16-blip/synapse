@@ -14,13 +14,13 @@ class ReportSummarizerTest extends CIUnitTestCase
     {
         parent::setUp();
         $this->db = \Config\Database::connect();
-        $this->db->transStart();
+        
         $this->summarizer = new ReportSummarizer();
     }
 
     protected function tearDown(): void
     {
-        $this->db->transRollback();
+        
         parent::tearDown();
     }
 
@@ -34,7 +34,7 @@ class ReportSummarizerTest extends CIUnitTestCase
             'top_complaint' => 'Severe Headache'
         ];
 
-        $result = $this->summarizer->generateSummary('clinic', '2026-06-01', '2026-06-30', $data, null, 1);
+        $result = $this->summarizer->generateSummary('clinic', '2026-06-01', '2026-06-30', $data, null, 100081);
         
         $text = $result['summary_text'];
         
@@ -58,7 +58,7 @@ class ReportSummarizerTest extends CIUnitTestCase
             'severe_screenings_count' => 4
         ];
 
-        $result = $this->summarizer->generateSummary('counselling', '2026-06-01', '2026-06-30', $data, null, 1);
+        $result = $this->summarizer->generateSummary('counselling', '2026-06-01', '2026-06-30', $data, null, 100081);
         
         $text = $result['summary_text'];
         

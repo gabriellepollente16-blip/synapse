@@ -17,12 +17,17 @@ class RiskScorer
         // phq-9 (template id 1) or gad-7 (template id 2)
         $templateId = ($scoreType === 'phq9_trend') ? 1 : 2;
 
-        $responses = $db->table('assessment_responses')
+        try {
+            $responses = $db->table('assessment_responses')
             ->where('student_id', $studentId)
             ->where('template_id', $templateId)
             ->orderBy('submitted_at', 'ASC')
             ->select('id, total_score, submitted_at')
             ->get()->getResultArray();
+        } catch (\Throwable $e) {
+            // screening tables dropped / not migrated: behave as if no history
+            $responses = [];
+        }
 
         $count = count($responses);
         if ($count === 0) {

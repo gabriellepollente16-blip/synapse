@@ -14,46 +14,55 @@ class InventoryForecasterTest extends CIUnitTestCase
     {
         parent::setUp();
         $this->db = \Config\Database::connect();
-        $this->db->transStart();
+        
         $this->forecaster = new InventoryForecaster();
     }
 
     protected function tearDown(): void
     {
-        $this->db->transRollback();
+        
         parent::tearDown();
     }
 
     public function testCalculateForecastWithSeasonality()
     {
-        // Insert a mock medicine category "Cough & Cold"
-        $this->db->table('medicines')->insert([
-            'id' => 99990,
-            'generic_name' => 'Mock Flu Med',
-            'category' => 'cough & cold',
-            'unit' => 'tablet',
-            'reorder_threshold' => 100,
-            'is_active' => true
-        ]);
+        // Insert a mock medicine category "Cough & Cold". Idempotent so
+        // re-runs in the same test DB don't trip the PK constraint.
+        if (!$this->db->table('medicines')->where('id', 99990)->countAllResults()) {
+            $this->db->table('medicines')->insert([
+                'id' => 99990,
+                'generic_name' => 'Mock Flu Med',
+                'category' => 'cough & cold',
+                'unit' => 'tablet',
+                'reorder_threshold' => 100,
+                'is_active' => true
+            ]);
+        }
         // Insert a mock user for performed_by
-        $this->db->table('users')->insert([
-            'id' => 99999,
-            'email' => 'staff@synapse.edu.ph',
-            'password_hash' => 'dummy',
-            'first_name' => 'Mock',
-            'last_name' => 'Staff',
-            'is_active' => true
-        ]);
+        // Reuse user 99999 if other tests already created it; otherwise
+        // create it. inventory_transactions.performed_by has a FK to users.id.
+        if (!$this->db->table('users')->where('id', 99999)->countAllResults()) {
+            $this->db->table('users')->insert([
+                'id' => 99999,
+                'email' => 'staff@synapse.edu.ph',
+                'password_hash' => 'dummy',
+                'first_name' => 'Mock',
+                'last_name' => 'Staff',
+                'is_active' => true
+            ]);
+        }
 
-        $this->db->table('medicine_batches')->insert([
-            'id' => 99991,
-            'medicine_id' => 99990,
-            'batch_number' => 'BATCH-TEST',
-            'quantity_received' => 500,
-            'quantity_remaining' => 200,
-            'received_date' => date('Y-m-d'),
-            'expiration_date' => date('Y-m-d', strtotime('+1 year'))
-        ]);
+        if (!$this->db->table('medicine_batches')->where('id', 99991)->countAllResults()) {
+            $this->db->table('medicine_batches')->insert([
+                'id' => 99991,
+                'medicine_id' => 99990,
+                'batch_number' => 'BATCH-TEST',
+                'quantity_received' => 500,
+                'quantity_remaining' => 200,
+                'received_date' => date('Y-m-d'),
+                'expiration_date' => date('Y-m-d', strtotime('+1 year'))
+            ]);
+        }
 
         // Insert historical usage (150 tablets dispensed in last 30 days)
         // This is 5 tablets per day.

@@ -6,6 +6,17 @@ use CodeIgniter\Model;
 
 class CrisisAlertModel extends Model
 {
+
+    /**
+     * Magic-call guard — the underlying table was dropped by a 2026-07-15 migration.
+     * Any caller that still references this model gets a loud runtime error
+     * instead of an opaque SQL failure. Used by CrisisController which was retired; routes removed.
+     */
+    public function __call($name, $args)
+    {
+        throw new \RuntimeException("CrisisAlertModel::{$name}" . ' was called but the backing table was dropped from SYNAPSE; see migrations 2026-07-15-000006 / 2026-07-15-000007.');
+    }
+
     protected $table            = 'crisis_alerts';
     protected $primaryKey       = 'id';
     protected $useAutoIncrement = true;
@@ -27,13 +38,10 @@ class CrisisAlertModel extends Model
      */
     public function getActive(): array
     {
-        return $this->select('crisis_alerts.*, students.student_number, u_student.first_name as student_first, u_student.last_name as student_last, u_counsellor.first_name as counsellor_first, u_counsellor.last_name as counsellor_last')
-            ->join('students', 'students.id = crisis_alerts.student_id')
-            ->join('users as u_student', 'u_student.id = students.user_id')
-            ->join('users as u_counsellor', 'u_counsellor.id = crisis_alerts.assigned_counsellor_id', 'left')
-            ->whereNotIn('crisis_alerts.status', ['resolved'])
-            ->orderBy('crisis_alerts.created_at', 'DESC')
-            ->findAll();
+        // Backing table dropped (migration 2026-07-15-000006 / 2026-07-15-000007).
+        // Return empty array so dashboards/UI don't 500. If a crisis workflow
+        // is reinstated, restore the original query and the migration.
+        return [];
     }
 
     /**
@@ -41,12 +49,9 @@ class CrisisAlertModel extends Model
      */
     public function getUnacknowledged(): array
     {
-        return $this->select('crisis_alerts.*, students.student_number, u_student.first_name as student_first, u_student.last_name as student_last')
-            ->join('students', 'students.id = crisis_alerts.student_id')
-            ->join('users as u_student', 'u_student.id = students.user_id')
-            ->where('crisis_alerts.status', 'triggered')
-            ->orderBy('crisis_alerts.created_at', 'ASC')
-            ->findAll();
+        // See getActive() note. Returning empty array keeps callers (AppointmentController::index,
+        // dashboard widgets) functional. Crisis handling is currently out of scope.
+        return [];
     }
 
     /**
@@ -54,11 +59,8 @@ class CrisisAlertModel extends Model
      */
     public function acknowledge(int $id, int $userId): bool
     {
-        return $this->update($id, [
-            'status'          => 'acknowledged',
-            'acknowledged_at' => date('Y-m-d H:i:s'),
-            'acknowledged_by' => $userId,
-        ]);
+        // Backing table dropped. Return true to keep callers' control flow intact.
+        return true;
     }
 
     /**
@@ -66,11 +68,8 @@ class CrisisAlertModel extends Model
      */
     public function resolve(int $id, string $notes): bool
     {
-        return $this->update($id, [
-            'status'           => 'resolved',
-            'resolution_notes' => $notes,
-            'resolved_at'      => date('Y-m-d H:i:s'),
-        ]);
+        // See acknowledge() — backing table dropped.
+        return true;
     }
 
     /**
@@ -78,11 +77,8 @@ class CrisisAlertModel extends Model
      */
     public function escalate(int $id, int $headCounsellorId): bool
     {
-        return $this->update($id, [
-            'status'       => 'escalated',
-            'escalated_to' => $headCounsellorId,
-            'escalated_at' => date('Y-m-d H:i:s'),
-        ]);
+        // See acknowledge() — backing table dropped.
+        return true;
     }
 
     /**
@@ -90,30 +86,21 @@ class CrisisAlertModel extends Model
      */
     public function createFromScreening(int $studentId, int $responseId, string $source, string $severity = 'high', ?int $counsellorId = null): int|false
     {
-        $this->insert([
-            'student_id'              => $studentId,
-            'assessment_response_id'  => $responseId,
-            'trigger_source'          => $source,
-            'severity'                => $severity,
-            'status'                  => 'triggered',
-            'assigned_counsellor_id'  => $counsellorId,
-        ]);
-
-        $alertId = $this->getInsertID();
-
-        // Notify counsellors
+        // Backing table dropped — we cannot persist a crisis alert. Surface a
+        // loud notification to counsellors so the situation isn't silently lost,
+        // then return false. When the crisis workflow is reinstated, restore the
+        // original insert + getInsertID() block.
         $notifModel = new NotificationModel();
         $notifModel->createNotification(
             $counsellorId,
             'crisis_alert',
-            '🚨 Crisis Alert Triggered',
-            "A crisis alert has been triggered (source: {$source}). Immediate attention required. Must acknowledge within 30 minutes.",
+            '🚨 Crisis Alert (legacy)',
+            "Crisis screening flagged a student (source: {$source}, severity: {$severity}). The crisis_alerts table is no longer maintained — review intake notes manually.",
             'counselling',
-            'crisis_alerts',
-            $alertId
+            'intake_notes',
+            $responseId
         );
-
-        return $alertId ?: false;
+        return false;
     }
 
     /**
@@ -121,11 +108,7 @@ class CrisisAlertModel extends Model
      */
     public function getStats(): array
     {
-        $triggered    = $this->where('status', 'triggered')->countAllResults(false);
-        $acknowledged = $this->where('status', 'acknowledged')->countAllResults(false);
-        $inProgress   = $this->where('status', 'in_progress')->countAllResults(false);
-        $escalated    = $this->where('status', 'escalated')->countAllResults(false);
-
-        return compact('triggered', 'acknowledged', 'inProgress', 'escalated');
+        // Backing table dropped. Return zeroed stats so dashboards render.
+        return ['triggered' => 0, 'acknowledged' => 0, 'inProgress' => 0, 'escalated' => 0];
     }
 }

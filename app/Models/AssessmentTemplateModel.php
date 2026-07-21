@@ -6,6 +6,17 @@ use CodeIgniter\Model;
 
 class AssessmentTemplateModel extends Model
 {
+
+    /**
+     * Magic-call guard — the underlying table was dropped by a 2026-07-15 migration.
+     * Any caller that still references this model gets a loud runtime error
+     * instead of an opaque SQL failure. Read screening templates.
+     */
+    public function __call($name, $args)
+    {
+        throw new \RuntimeException("AssessmentTemplateModel::{$name}" . ' was called but the backing table was dropped from SYNAPSE; see migrations 2026-07-15-000006 / 2026-07-15-000007.');
+    }
+
     protected $table            = 'assessment_templates';
     protected $primaryKey       = 'id';
     protected $useAutoIncrement = true;
@@ -21,13 +32,10 @@ class AssessmentTemplateModel extends Model
      */
     public function getActive(?string $type = null): array
     {
-        $builder = $this->where('is_active', true);
-
-        if ($type) {
-            $builder->where('type', $type);
-        }
-
-        return $builder->orderBy('title', 'ASC')->findAll();
+        // Backing table dropped (migration 2026-07-15-000006 / 2026-07-15-000007).
+        // Return empty array so ScreeningController::index() can render the page.
+        // Re-add the original query when the screening workflow is reinstated.
+        return [];
     }
 
     /**
@@ -35,12 +43,8 @@ class AssessmentTemplateModel extends Model
      */
     public function getWithQuestions(int $id): ?array
     {
-        $template = $this->find($id);
-        if ($template === null) return null;
-
-        $questionModel = new AssessmentQuestionModel();
-        $template['questions'] = $questionModel->getByTemplate($id);
-
-        return $template;
+        // Backing table dropped. No live template to surface; return null so
+        // callers redirect away with a clear "not found" message.
+        return null;
     }
 }

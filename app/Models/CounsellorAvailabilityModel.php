@@ -55,10 +55,11 @@ class CounsellorAvailabilityModel extends Model
     {
         $dayOfWeek = (int) date('w', strtotime($date));
 
+        // Qualify is_active — both counsellor_availability and users have it.
         $slots = $this->select('counsellor_availability.*, users.first_name, users.last_name')
             ->join('users', 'users.id = counsellor_availability.counsellor_id')
             ->where('day_of_week', $dayOfWeek)
-            ->where('is_active', true)
+            ->where('counsellor_availability.is_active', true)
             ->findAll();
 
         // Check existing bookings for this date

@@ -130,20 +130,7 @@ $routes->group('counselling', ['filter' => 'role:admin,counsellor'], static func
     $routes->post('appointments/no-show/(:num)', 'Counselling\AppointmentController::markNoShow/$1');
     $routes->post('appointments/cancel/(:num)', 'Counselling\AppointmentController::cancel/$1');
 
-    // Screenings
-    $routes->get('screenings', 'Counselling\ScreeningController::index');
-    $routes->get('screenings/take/(:num)', 'Counselling\ScreeningController::take/$1');
-    $routes->post('screenings/submit', 'Counselling\ScreeningController::submit');
-    $routes->get('screenings/results/(:num)', 'Counselling\ScreeningController::results/$1');
-    $routes->get('screenings/history/(:num)', 'Counselling\ScreeningController::history/$1');
-
     // Crisis Alerts
-    $routes->get('crisis', 'Counselling\CrisisController::index');
-    $routes->post('crisis/acknowledge/(:num)', 'Counselling\CrisisController::acknowledge/$1');
-    $routes->post('crisis/resolve/(:num)', 'Counselling\CrisisController::resolve/$1');
-    $routes->post('crisis/escalate/(:num)', 'Counselling\CrisisController::escalate/$1');
-
-    // Availability
     $routes->get('availability', 'Counselling\AvailabilityController::index');
     $routes->post('availability/add', 'Counselling\AvailabilityController::addSlot');
     $routes->post('availability/remove/(:num)', 'Counselling\AvailabilityController::removeSlot/$1');
@@ -152,6 +139,13 @@ $routes->group('counselling', ['filter' => 'role:admin,counsellor'], static func
     $routes->get('referrals', 'Counselling\ReferralController::index');
     $routes->post('referrals/accept/(:num)', 'Counselling\ReferralController::accept/$1');
     $routes->post('referrals/decline/(:num)', 'Counselling\ReferralController::decline/$1');
+
+    // Screenings (PHQ-9, GAD-7, etc.)
+    $routes->get('screenings',                       'Counselling\ScreeningController::index');
+    $routes->get('screenings/take/(:num)',           'Counselling\ScreeningController::take/$1');
+    $routes->post('screenings/submit',               'Counselling\ScreeningController::submit');
+    $routes->get('screenings/results/(:num)',        'Counselling\ScreeningController::results/$1');
+    $routes->get('screenings/history/(:num)',        'Counselling\ScreeningController::history/$1');
 });
 
 // ============================================================
@@ -303,3 +297,4 @@ $routes->group('inventory/reorders', ['filter' => 'role:admin,clinic_staff,repor
     $routes->post('(:num)/cancel',  'Inventory\ReorderController::cancel/$1', ['filter' => 'role:admin,clinic_staff']);
     $routes->get('trigger/(:num)',  'Inventory\ReorderController::trigger/$1', ['filter' => 'role:admin,clinic_staff']);
 });
+

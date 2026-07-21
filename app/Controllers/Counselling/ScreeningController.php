@@ -147,7 +147,7 @@ class ScreeningController extends BaseController
             $riskModel = new \App\Models\AiRiskScoreModel();
             $notifModel = new NotificationModel();
 
-            $riskModel->insert([
+            $riskModel->persist([
                 'student_id'             => $studentId,
                 'assessment_response_id' => $responseId,
                 'score_type'             => $scoreType,
@@ -218,7 +218,7 @@ class ScreeningController extends BaseController
 
         // AI Risk Score
         $aiRiskModel = new \App\Models\AiRiskScoreModel();
-        $aiRisk = $aiRiskModel->where('assessment_response_id', $responseId)->first();
+        $aiRisk = $aiRiskModel->getLatestForResponse($responseId);
 
         return view('counselling/screenings/results', [
             'title'        => 'Screening Results — SYNAPSE',

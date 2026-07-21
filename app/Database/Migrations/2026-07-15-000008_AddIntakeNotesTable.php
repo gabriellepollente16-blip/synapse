@@ -37,7 +37,7 @@ class AddIntakeNotesTable extends Migration
         $this->forge->addForeignKey('employee_id', 'employees', 'id', '', 'SET NULL');
         $this->forge->addForeignKey('counsellor_id', 'users', 'id', '', 'CASCADE');
         $this->forge->addForeignKey('appointment_id', 'counselling_appointments', 'id', '', 'SET NULL');
-        $this->forge->addKey(['patient_type', 'student_id', 'employee_id'], 'idx_intake_patient');
+        $this->forge->addKey(['patient_type', 'student_id', 'employee_id'], false, false, 'idx_intake_patient');
         $this->forge->addKey('counsellor_id');
         $this->forge->addKey('session_date');
         $this->forge->createTable('intake_notes', true);

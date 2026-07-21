@@ -170,32 +170,13 @@ class MockDataSeeder extends Seeder
                     'created_at'       => Time::now()->toDateTimeString()
                 ]);
 
-                // Add some PHQ-9 screenings
-                if (rand(0, 1)) {
-                    $score = rand(0, 27);
-                    $severity = 'Minimal';
-                    if ($score >= 5) $severity = 'Mild';
-                    if ($score >= 10) $severity = 'Moderate';
-                    if ($score >= 15) $severity = 'Moderately Severe';
-                    if ($score >= 20) $severity = 'Severe';
-
-                    $this->db->table('assessment_responses')->insert([
-                        'template_id'     => 1, // PHQ-9 template
-                        'student_id'      => $studentId,
-                        'responses'       => json_encode(['q1' => rand(0,3), 'q2' => rand(0,3)]),
-                        'total_score'     => $score,
-                    ]);
-                    $responseId = $this->db->insertID();
-
-                    $this->db->table('ai_risk_scores')->insert([
-                        'student_id'      => $studentId,
-                        'assessment_response_id' => $responseId,
-                        'risk_level'      => ['low', 'medium', 'high', 'critical'][array_rand(['low', 'medium', 'high', 'critical'])],
-                        'risk_factors'    => json_encode(['High stress', 'Sleep issues']),
-                        'confidence_score' => rand(70, 95),
-                        'created_at'      => $date->toDateTimeString()
-                    ]);
-                }
+                // Skip PHQ-9 screenings — tables dropped. Replace the if-block
+                // with a no-op so the seeder still finishes without error.
+                /* PHQ-9 block removed — assessment_responses + ai_risk_scores tables were dropped.
+                   Migration history:
+                     - 2026-07-15-000006_DropScreeningTables
+                     - 2026-07-15-000007_DropCrisisAlertsTable
+                   All screening concerns are now captured via intake_notes. */
             } catch (\Exception $e) {}
         }
 

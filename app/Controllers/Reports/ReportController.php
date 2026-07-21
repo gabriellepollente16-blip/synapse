@@ -23,6 +23,44 @@ use App\Libraries\ReportSummarizer;
  */
 class ReportController extends BaseController
 {
+
+    /**
+     * Count rows in a table safely. Returns 0 if the table is missing
+     * (e.g. dropped by migrations). Lets reports render even when an
+     * optional capability table has been removed.
+     */
+    private function safeCount($db, string $table, array $where = []): int
+    {
+        try {
+            $builder = $db->table($table);
+            foreach ($where as $col => $val) {
+                $builder = $builder->where($col, $val);
+            }
+            return (int) $builder->countAllResults();
+        } catch (\Throwable $e) {
+            log_message("info", "ReportController::safeCount skipped missing table: " . $table);
+            return 0;
+        }
+    }
+
+    /**
+     * Run a grouped SELECT safely against an optional table.
+     * Returns an empty array if the table is missing.
+     */
+    private function safeSelect($db, string $table, string $select, array $where, string $groupBy): array
+    {
+        try {
+            $builder = $db->table($table)->select($select);
+            foreach ($where as $col => $val) {
+                $builder = $builder->where($col, $val);
+            }
+            return $builder->groupBy($groupBy)->get()->getResultArray();
+        } catch (\Throwable $e) {
+            log_message("info", "ReportController::safeSelect skipped missing table: " . $table);
+            return [];
+        }
+    }
+
     /**
      * Validated date range used by every analytics method.
      *
@@ -240,24 +278,12 @@ class ReportController extends BaseController
         $noShowRate = $totalAppts > 0 ? round(($noShowCount / $totalAppts) * 100, 1) : 0.0;
 
         // Crisis alerts within range
-        $crisisAlerts = (int) $db->table('crisis_alerts')
-            ->where('created_at >=', $range['start'] . ' 00:00:00')
-            ->where('created_at <=', $range['end']   . ' 23:59:59')
-            ->countAllResults();
+        $crisisAlerts = $this->safeCount($db, 'crisis_alerts', ['created_at >=' => $range['start'].' 00:00:00', 'created_at <=' => $range['end'].' 23:59:59']);
 
-        $crisisBySeverity = $db->table('crisis_alerts')
-            ->select('severity, COUNT(*) AS cnt')
-            ->where('created_at >=', $range['start'] . ' 00:00:00')
-            ->where('created_at <=', $range['end']   . ' 23:59:59')
-            ->groupBy('severity')
-            ->get()->getResultArray();
+        $crisisBySeverity = $this->safeSelect($db, 'crisis_alerts', 'severity, COUNT(*) AS cnt', ['created_at >=' => $range['start'].' 00:00:00', 'created_at <=' => $range['end'].' 23:59:59'], 'severity');
 
         // Severe screenings (PHQ-9 / GAD-7 with total_score >= 15)
-        $severeScreenings = (int) $db->table('assessment_responses')
-            ->where('submitted_at >=', $range['start'] . ' 00:00:00')
-            ->where('submitted_at <=', $range['end']   . ' 23:59:59')
-            ->where('total_score >=', 15)
-            ->countAllResults();
+        $severeScreenings = $this->safeCount($db, 'assessment_responses', ['submitted_at >=' => $range['start'].' 00:00:00', 'submitted_at <=' => $range['end'].' 23:59:59', 'total_score >=' => 15]);
 
         // AI narrative summary
         $summarizer = new ReportSummarizer();

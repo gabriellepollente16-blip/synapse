@@ -37,8 +37,6 @@ class AddEmployeesTable extends Migration
 
         $this->forge->addPrimaryKey('id');
         $this->forge->addForeignKey('user_id', 'users', 'id', '', 'CASCADE');
-        $this->forge->addKey('employee_number');
-        $this->forge->addKey('rfid_tag');
         $this->forge->addKey('employment_status');
         $this->forge->createTable('employees', true);
     }
@@ -48,3 +46,4 @@ class AddEmployeesTable extends Migration
         $this->forge->dropTable('employees', true);
     }
 }
+

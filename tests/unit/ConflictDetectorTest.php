@@ -14,13 +14,13 @@ class ConflictDetectorTest extends CIUnitTestCase
     {
         parent::setUp();
         $this->db = \Config\Database::connect();
-        $this->db->transStart(); // Start transaction for safety
+         // Start transaction for safety
         $this->conflictDetector = new ConflictDetector();
     }
 
     protected function tearDown(): void
     {
-        $this->db->transRollback(); // Roll back all insertions/deletions
+         // Roll back all insertions/deletions
         parent::tearDown();
     }
 

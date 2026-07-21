@@ -45,7 +45,7 @@ class SchedulingOptimizerTest extends CIUnitTestCase
             $status = ($i < 4) ? 'no_show' : 'completed';
             $this->db->table('counselling_appointments')->insert([
                 'counsellor_id' => 99993,
-                'student_id' => 1, // Uses default seeded student for FK sake
+                'student_id' => 100000, // Uses a real seeded student
                 'appointment_date' => '2026-06-22', // Monday
                 'start_time' => '09:00:00',
                 'end_time' => '10:00:00',

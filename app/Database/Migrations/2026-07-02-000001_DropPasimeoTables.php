@@ -18,7 +18,7 @@ use CodeIgniter\Database\Migration;
  *   4. outreach_programs        (FK -> users)
  *   5. volunteer_workload_scores (no FK out, but related AI table)
  */
-class 2026-07-02-000001-DropPasimeoTables extends Migration
+class DropPasimeoTables extends Migration
 {
     public function up(): void
     {

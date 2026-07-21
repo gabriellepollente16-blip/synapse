@@ -4,6 +4,43 @@ namespace App\Controllers;
 
 class DashboardController extends BaseController
 {
+
+    /**
+     * Load screening templates safely. Returns []. The
+     * assessment_templates table was dropped by migrations so
+     * the student dashboard renders an empty list rather than 500.
+     */
+    private function safeTemplates($db): array
+    {
+        try {
+            return $db->table('assessment_templates')
+                ->where('is_active', true)
+                ->get()->getResultArray();
+        } catch (\Throwable $e) {
+            log_message('info', 'DashboardController::safeTemplates skipped missing table');
+            return [];
+        }
+    }
+
+
+    /**
+     * Count rows in a table safely. Returns 0 if the table is missing
+     * (e.g. dropped by migrations). Lets dashboards render even when
+     * an optional capability table has been removed.
+     */
+    private function safeCount($db, string $table, array $where = []): int
+    {
+        try {
+            $builder = $db->table($table);
+            foreach ($where as $col => $val) {
+                $builder = $builder->where($col, $val);
+            }
+            return (int) $builder->countAllResults();
+        } catch (\Throwable $e) {
+            log_message('info', 'safeCount skipped missing table: ' . $table);
+            return 0;
+        }
+    }
     /**
      * Main dashboard — cross-module overview.
      * Shows a single page summarizing all tabs (Clinic, Counselling, BMG,
@@ -65,13 +102,8 @@ class DashboardController extends BaseController
                 ->where('appointment_date >=', $thirtyDaysAgo)
                 ->where('status', 'no_show')
                 ->countAllResults(false);
-            $counsellingKpis['crisis_alerts'] = (int) $db->table('crisis_alerts')
-                ->where('created_at >=', $thirtyDaysAgo)
-                ->countAllResults(false);
-            $counsellingKpis['severe_screening'] = (int) $db->table('assessment_responses')
-                ->where('submitted_at >=', $thirtyDaysAgo)
-                ->where('total_score >=', 15)
-                ->countAllResults(false);
+            $counsellingKpis['crisis_alerts']    = $this->safeCount($db, 'crisis_alerts',          ['created_at >=' => $thirtyDaysAgo]);
+            $counsellingKpis['severe_screening'] = $this->safeCount($db, 'assessment_responses', ['submitted_at >=' => $thirtyDaysAgo, 'total_score >=' => 15]);
         }
 
         // -------- BMG / FACILITY OPERATIONS module summary --------
@@ -250,8 +282,8 @@ class DashboardController extends BaseController
         // Fetch Counselling summaries
         $totalAppts = $db->table('counselling_appointments')->where('appointment_date >=', $thirtyDaysAgo)->countAllResults(false);
         $noShows = $db->table('counselling_appointments')->where('appointment_date >=', $thirtyDaysAgo)->where('status', 'no_show')->countAllResults(false);
-        $crisisAlerts = $db->table('crisis_alerts')->where('created_at >=', $thirtyDaysAgo)->countAllResults(false);
-        $severeScreenings = $db->table('assessment_responses')->where('submitted_at >=', $thirtyDaysAgo)->where('total_score >=', 15)->countAllResults(false);
+        $crisisAlerts     = $this->safeCount($db, 'crisis_alerts',         ['created_at >=' => $thirtyDaysAgo]);
+        $severeScreenings = $this->safeCount($db, 'assessment_responses', ['submitted_at >=' => $thirtyDaysAgo, 'total_score >=' => 15]);
 
         $counsellData = [
             'total_appointments'      => $totalAppts,
@@ -342,8 +374,8 @@ class DashboardController extends BaseController
 
         $totalAppts = $db->table('counselling_appointments')->where('appointment_date >=', $thirtyDaysAgo)->countAllResults(false);
         $noShows = $db->table('counselling_appointments')->where('appointment_date >=', $thirtyDaysAgo)->where('status', 'no_show')->countAllResults(false);
-        $crisisAlerts = $db->table('crisis_alerts')->where('created_at >=', $thirtyDaysAgo)->countAllResults(false);
-        $severeScreenings = $db->table('assessment_responses')->where('submitted_at >=', $thirtyDaysAgo)->where('total_score >=', 15)->countAllResults(false);
+        $crisisAlerts     = $this->safeCount($db, 'crisis_alerts',         ['created_at >=' => $thirtyDaysAgo]);
+        $severeScreenings = $this->safeCount($db, 'assessment_responses', ['submitted_at >=' => $thirtyDaysAgo, 'total_score >=' => 15]);
 
         $counsellData = [
             'total_appointments'      => $totalAppts,
@@ -435,9 +467,7 @@ class DashboardController extends BaseController
                 ->orderBy('start_time', 'ASC')
                 ->get()->getResultArray();
 
-            $templates = $db->table('assessment_templates')
-                ->where('is_active', true)
-                ->get()->getResultArray();
+            $templates = $this->safeTemplates($db);
 
             /* Live queue banner — if this student has an active
                consultation today (waiting / called / in_session), show
@@ -493,12 +523,15 @@ class DashboardController extends BaseController
         // Active batches
         $activeBatches = $batchModel->getActiveBatches();
 
-        // Recent completed batches (last 30 days)
+        // Recent completed batches (last 30 days). The view shows drum_code
+        // and drum_name columns, so join through bmg_drums.
         $thirtyDaysAgo = date('Y-m-d', strtotime('-30 days'));
         $completedBatches = $batchModel
-            ->where('status', 'completed')
-            ->where('completion_date >=', $thirtyDaysAgo)
-            ->orderBy('completion_date', 'DESC')
+            ->select('bmg_batches.*, bmg_drums.drum_code, bmg_drums.name AS drum_name')
+            ->join('bmg_drums', 'bmg_drums.id = bmg_batches.drum_id', 'left')
+            ->where('bmg_batches.status', 'completed')
+            ->where('bmg_batches.completion_date >=', $thirtyDaysAgo)
+            ->orderBy('bmg_batches.completion_date', 'DESC')
             ->limit(10)
             ->findAll();
 

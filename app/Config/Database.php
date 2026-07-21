@@ -197,8 +197,19 @@ class Database extends Config
         // Ensure that we always set the database group to 'tests' if
         // we are currently running an automated test suite, so that
         // we don't overwrite live data on accident.
-        if (ENVIRONMENT === 'testing') {
-            $this->defaultGroup = 'tests';
-        }
+
+        // Resolve the 'tests' connection from environment variables so the
+        // phpunit.dist.xml <env> entries (or operator-supplied env vars)
+        // determine the actual test database. Defaults to the framework's
+        // original SQLite-in-memory setup when no overrides are provided.
+        $this->tests['hostname'] = env('database.tests.hostname', $this->tests['hostname']);
+        $this->tests['username'] = env('database.tests.username', $this->tests['username']);
+        $this->tests['password'] = env('database.tests.password', $this->tests['password']);
+        $this->tests['database'] = env('database.tests.database', $this->tests['database']);
+        $this->tests['DBDriver'] = env('database.tests.DBDriver', $this->tests['DBDriver']);
+        $this->tests['DBPrefix'] = env('database.tests.DBPrefix', $this->tests['DBPrefix']);
+
+        // Default group is left at 'default'; callers using Database::connect('tests')
+        // pick up the overridden test connection via env vars above.
     }
 }

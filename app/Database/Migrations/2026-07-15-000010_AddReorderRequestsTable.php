@@ -17,7 +17,7 @@ class AddReorderRequestsTable extends Migration
     {
         $this->forge->addField([
             'id'                       => ['type' => 'BIGINT', 'unsigned' => true, 'auto_increment' => true],
-            'medicine_id'              => ['type' => 'INT', 'unsigned' => true],
+            'medicine_id'              => ['type' => 'BIGINT', 'unsigned' => true],
             'requested_quantity'       => ['type' => 'INT', 'unsigned' => true],
             'current_stock'            => ['type' => 'INT', 'unsigned' => true],
             'reorder_level'            => ['type' => 'INT', 'unsigned' => true],
@@ -37,8 +37,8 @@ class AddReorderRequestsTable extends Migration
         $this->forge->addForeignKey('medicine_id', 'medicines', 'id', '', 'CASCADE');
         $this->forge->addForeignKey('requested_by', 'users', 'id', '', 'RESTRICT');
         $this->forge->addForeignKey('approved_by', 'users', 'id', '', 'SET NULL');
-        $this->forge->addKey('status', 'idx_reorder_status');
-        $this->forge->addKey('urgency', 'idx_reorder_urgency');
+        $this->forge->addKey('status', false, false, 'idx_reorder_status');
+        $this->forge->addKey('urgency', false, false, 'idx_reorder_urgency');
         $this->forge->addKey('medicine_id');
         $this->forge->createTable('reorder_requests', true);
     }

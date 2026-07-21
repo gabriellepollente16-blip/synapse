@@ -30,8 +30,8 @@ class AddCheckinLogsTable extends Migration
         $this->forge->addPrimaryKey('id');
         $this->forge->addForeignKey('student_id', 'students', 'id', '', 'SET NULL');
         $this->forge->addForeignKey('employee_id', 'employees', 'id', '', 'SET NULL');
-        $this->forge->addKey(['patient_type', 'student_id', 'employee_id'], 'idx_checkin_patient');
-        $this->forge->addKey('checkin_at', 'idx_checkin_at');
+        $this->forge->addKey(['patient_type', 'student_id', 'employee_id'], false, false, 'idx_checkin_patient');
+        $this->forge->addKey('checkin_at', false, false, 'idx_checkin_at');
         $this->forge->addKey('rfid_tag_scanned');
         $this->forge->createTable('checkin_logs', true);
     }

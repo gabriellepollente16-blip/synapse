@@ -31,10 +31,13 @@ class AuditController extends BaseController
             ->join('users u', 'u.id = al.user_id', 'left');
 
         if ($q !== '') {
+            // Escape LIKE wildcards (% _) so a user typing underscores
+            // doesn't match every row. See like_escape_helper.php.
+            $qEscaped = escape_like($q);
             $builder->groupStart()
-                ->like('al.entity_type', $q)
-                ->orLike('al.ip_address', $q)
-                ->orLike('al.entity_id', $q)
+                ->like('al.entity_type', $qEscaped)
+                ->orLike('al.ip_address', $qEscaped)
+                ->orLike('al.entity_id', $qEscaped)
                 ->groupEnd();
         }
 

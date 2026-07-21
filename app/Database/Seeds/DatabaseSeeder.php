@@ -33,8 +33,14 @@ class DatabaseSeeder extends Seeder
         echo "\n[6/7] Seeding Students...\n";
         $this->call('StudentSeeder');
 
-        echo "\n[7/7] Seeding Assessments & Counsellor...\n";
+        echo "\n[7/8] Seeding Assessments (no-op) & Counsellor...\n";
         $this->call('AssessmentSeeder');
+
+        echo "\n[8/9] Seeding Facilities (BMG drums/batches/process/output)...\n";
+        $this->call('FacilitiesSeeder');
+
+        echo "\n[9/9] Seeding System Modules registry...\n";
+        $this->call('SystemModulesSeeder');
 
         echo "\n=== Seeding Complete ===\n";
     }

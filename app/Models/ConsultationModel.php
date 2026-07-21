@@ -62,10 +62,17 @@ class ConsultationModel extends Model
      */
     public function getByStudent(int $studentId, int $limit = 10): array
     {
-        return $this->select('consultations.*, users.first_name as staff_first, users.last_name as staff_last')
+        // Select the consultation plus the attending staff name + the
+        // student's name/number. The same columns are exposed as the
+        // today's-queue shape (student_first/student_last/student_number)
+        // so that views rendered against both data shapes work without
+        // crashing on missing keys.
+        return $this->select('consultations.*, users.first_name as staff_first, users.last_name as staff_last, students.student_number, users_student.first_name as student_first, users_student.last_name as student_last')
             ->join('users', 'users.id = consultations.attending_user_id')
-            ->where('student_id', $studentId)
-            ->orderBy('consultation_date', 'DESC')
+            ->join('students', 'students.id = consultations.student_id')
+            ->join('users as users_student', 'users_student.id = students.user_id')
+            ->where('consultations.student_id', $studentId)
+            ->orderBy('consultations.consultation_date', 'DESC')
             ->limit($limit)
             ->findAll();
     }

@@ -28,8 +28,8 @@ class AddBmgDrumsTable extends Migration
         ]);
 
         $this->forge->addPrimaryKey('id');
-        $this->forge->addKey('current_status', 'idx_drums_status');
-        $this->forge->addKey('is_archived', 'idx_drums_archived');
+        $this->forge->addKey('current_status', false, false, 'idx_drums_status');
+        $this->forge->addKey('is_archived', false, false, 'idx_drums_archived');
         $this->forge->createTable('bmg_drums', true);
     }
 

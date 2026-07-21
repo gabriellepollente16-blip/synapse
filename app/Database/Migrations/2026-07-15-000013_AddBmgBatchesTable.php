@@ -45,9 +45,9 @@ class AddBmgBatchesTable extends Migration
         $this->forge->addForeignKey('waste_category_id', 'waste_categories', 'id', '', 'RESTRICT');
         $this->forge->addForeignKey('input_recorded_by', 'users', 'id', '', 'SET NULL');
         $this->forge->addForeignKey('completed_by', 'users', 'id', '', 'SET NULL');
-        $this->forge->addKey('status', 'idx_batches_status');
-        $this->forge->addKey('drum_id', 'idx_batches_drum');
-        $this->forge->addKey('start_date', 'idx_batches_start_date');
+        $this->forge->addKey('status', false, false, 'idx_batches_status');
+        $this->forge->addKey('drum_id', false, false, 'idx_batches_drum');
+        $this->forge->addKey('start_date', false, false, 'idx_batches_start_date');
         $this->forge->createTable('bmg_batches', true);
     }
 
